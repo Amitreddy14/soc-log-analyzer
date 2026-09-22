@@ -18,7 +18,7 @@ This pipeline automates the three most time-consuming SOC tasks:
 
 | Capability | Description | Status |
 |---|---|---|
-| **Ingestion & Normalization** | Multi-source log parsing (firewall, syslog, auth, IDS) → unified CEF schema | ✅ Complete |
+| **Ingestion & Normalization** | Multi-source log parsing (firewall, syslog, auth, IDS) → unified CEF schema | 🔨 Phase 1 |
 | **Severity Classification** | ML-based triage (critical/high/medium/low/benign) with confidence scores | 🔨 Phase 2 |
 | **Alert Correlation** | Groups related events into single incidents (e.g., scan → brute force → login) | 🔨 Phase 3 |
 | **LLM Summarization** | Natural language incident reports with impact assessment and response actions | 🔨 Phase 4 |
@@ -180,4 +180,4 @@ MIT
 
 ## Author
 
-**Amit** — [GitHub](https://github.com/yourusername)
+**Amit** — [GitHub](https://github.com/Amitreddy14)
