@@ -105,6 +105,7 @@ def generate_samples(count: int) -> None:
     console.print(f"[green]✓[/] Sample files generated in {settings.sample_data_dir}")
 
 
+<<<<<<< HEAD
 @main.command()
 @click.option(
     "--model-type", "-m",
@@ -197,5 +198,7 @@ def predict(path: str, model: str, source: str | None) -> None:
     pipeline.stop()
 
 
+=======
+>>>>>>> f3ff8a7cee430653e81beda3f327259db5a6d364
 if __name__ == "__main__":
     main()
