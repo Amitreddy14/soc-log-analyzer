@@ -105,7 +105,71 @@ def generate_samples(count: int) -> None:
     console.print(f"[green]✓[/] Sample files generated in {settings.sample_data_dir}")
 
 
-<<<<<<< HEAD
+@main.command()
+@click.option("--window", "-w", type=int, default=300, help="Time window in seconds for grouping.")
+@click.option("--min-events", type=int, default=3, help="Minimum events to form an incident.")
+def correlate(window: int, min_events: int) -> None:
+    """Correlate events in the database into incidents."""
+    import duckdb
+    import pandas as pd
+    from soc_analyzer.correlation import CorrelationEngine
+    from soc_analyzer.correlation.strategies import (
+        AttackChainCorrelator,
+        StatisticalCorrelator,
+        TimeWindowCorrelator,
+    )
+    from soc_analyzer.models.schemas import (
+        AttackCategory,
+        LogSource,
+        NormalizedLogEvent,
+        SeverityLevel,
+    )
+
+    conn = duckdb.connect(settings.db.path, read_only=True)
+    df = conn.execute("SELECT * FROM events").fetchdf()
+    conn.close()
+
+    console.print(f"\n[bold]Loaded {len(df):,} events from database[/]")
+
+    # Convert DataFrame rows to NormalizedLogEvent objects
+    events: list[NormalizedLogEvent] = []
+    for _, row in df.iterrows():
+        try:
+            events.append(NormalizedLogEvent(
+                id=str(row.get("id", "")),
+                timestamp=row["timestamp"],
+                severity=SeverityLevel(row["severity"]),
+                source_type=LogSource(row["source_type"]),
+                src_ip=row.get("src_ip"),
+                src_port=int(row["src_port"]) if pd.notna(row.get("src_port")) else None,
+                dst_ip=row.get("dst_ip"),
+                dst_port=int(row["dst_port"]) if pd.notna(row.get("dst_port")) else None,
+                protocol=row.get("protocol"),
+                bytes_in=int(row["bytes_in"]) if pd.notna(row.get("bytes_in")) else None,
+                bytes_out=int(row["bytes_out"]) if pd.notna(row.get("bytes_out")) else None,
+                action=row.get("action"),
+                event_name=row.get("event_name", ""),
+                attack_category=AttackCategory(row["attack_category"]) if row.get("attack_category") else AttackCategory.UNKNOWN,
+                flow_duration=float(row["flow_duration"]) if pd.notna(row.get("flow_duration")) else None,
+                total_fwd_packets=int(row["total_fwd_packets"]) if pd.notna(row.get("total_fwd_packets")) else None,
+                total_bwd_packets=int(row["total_bwd_packets"]) if pd.notna(row.get("total_bwd_packets")) else None,
+                flow_bytes_per_sec=float(row["flow_bytes_per_sec"]) if pd.notna(row.get("flow_bytes_per_sec")) else None,
+            ))
+        except Exception:
+            continue
+
+    console.print(f"[cyan]Parsed {len(events):,} events for correlation[/]")
+
+    engine = CorrelationEngine(strategies=[
+        TimeWindowCorrelator(window_seconds=window, min_events=min_events),
+        AttackChainCorrelator(window_seconds=3600, min_stages=2),
+        StatisticalCorrelator(eps=0.5, min_samples=5),
+    ])
+
+    engine.correlate(events)
+    engine.print_summary()
+
+
 @main.command()
 @click.option(
     "--model-type", "-m",
@@ -198,7 +262,5 @@ def predict(path: str, model: str, source: str | None) -> None:
     pipeline.stop()
 
 
-=======
->>>>>>> f3ff8a7cee430653e81beda3f327259db5a6d364
 if __name__ == "__main__":
     main()
