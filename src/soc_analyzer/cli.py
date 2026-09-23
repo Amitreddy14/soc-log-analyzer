@@ -171,6 +171,79 @@ def correlate(window: int, min_events: int) -> None:
 
 
 @main.command()
+@click.option("--provider", "-p", type=click.Choice(["openai", "anthropic"]), default=None,
+              help="LLM provider (omit for template-only mode).")
+@click.option("--model", type=str, default=None, help="Model name (uses provider default if omitted).")
+@click.option("--output", "-o", type=click.Path(), default="reports", help="Output directory for reports.")
+@click.option("--format", "-f", "fmt", type=click.Choice(["markdown", "json"]), default="markdown")
+@click.option("--max-reports", "-n", type=int, default=None, help="Max number of reports to generate.")
+def summarize(provider: str | None, model: str | None, output: str, fmt: str, max_reports: int | None) -> None:
+    """Generate incident reports from correlated events."""
+    import duckdb
+    import pandas as pd
+    from soc_analyzer.correlation import CorrelationEngine
+    from soc_analyzer.correlation.strategies import (
+        AttackChainCorrelator, StatisticalCorrelator, TimeWindowCorrelator,
+    )
+    from soc_analyzer.summarization import SummarizationEngine
+    from soc_analyzer.models.schemas import (
+        AttackCategory, LogSource, NormalizedLogEvent, SeverityLevel,
+    )
+
+    # Load events
+    conn = duckdb.connect(settings.db.path, read_only=True)
+    df = conn.execute("SELECT * FROM events").fetchdf()
+    conn.close()
+    console.print(f"\n[bold]Loaded {len(df):,} events[/]")
+
+    # Convert to event objects
+    events: list[NormalizedLogEvent] = []
+    for _, row in df.iterrows():
+        try:
+            events.append(NormalizedLogEvent(
+                id=str(row.get("id", "")),
+                timestamp=row["timestamp"],
+                severity=SeverityLevel(row["severity"]),
+                source_type=LogSource(row["source_type"]),
+                src_ip=row.get("src_ip"),
+                src_port=int(row["src_port"]) if pd.notna(row.get("src_port")) else None,
+                dst_ip=row.get("dst_ip"),
+                dst_port=int(row["dst_port"]) if pd.notna(row.get("dst_port")) else None,
+                protocol=row.get("protocol"),
+                bytes_in=int(row["bytes_in"]) if pd.notna(row.get("bytes_in")) else None,
+                bytes_out=int(row["bytes_out"]) if pd.notna(row.get("bytes_out")) else None,
+                action=row.get("action"),
+                event_name=row.get("event_name", ""),
+                attack_category=AttackCategory(row["attack_category"]) if row.get("attack_category") else AttackCategory.UNKNOWN,
+                flow_duration=float(row["flow_duration"]) if pd.notna(row.get("flow_duration")) else None,
+                total_fwd_packets=int(row["total_fwd_packets"]) if pd.notna(row.get("total_fwd_packets")) else None,
+                total_bwd_packets=int(row["total_bwd_packets"]) if pd.notna(row.get("total_bwd_packets")) else None,
+                flow_bytes_per_sec=float(row["flow_bytes_per_sec"]) if pd.notna(row.get("flow_bytes_per_sec")) else None,
+            ))
+        except Exception:
+            continue
+
+    # Correlate
+    corr_engine = CorrelationEngine(strategies=[
+        TimeWindowCorrelator(window_seconds=300, min_events=3),
+        AttackChainCorrelator(window_seconds=3600, min_stages=2),
+        StatisticalCorrelator(eps=0.5, min_samples=5),
+    ])
+    incidents = corr_engine.correlate(events)
+
+    if not incidents:
+        console.print("[yellow]No incidents found to summarize.[/]")
+        return
+
+    # Summarize
+    sum_engine = SummarizationEngine(provider=provider, model=model)
+    reports = sum_engine.summarize_all(incidents, max_reports=max_reports)
+    sum_engine.print_summary_table(reports)
+    sum_engine.save_reports(reports, output_dir=output, format=fmt)
+    sum_engine.print_reports(reports[:3])  # Show top 3 in console
+
+
+@main.command()
 @click.option(
     "--model-type", "-m",
     type=click.Choice(["random_forest", "gradient_boosting"]),
