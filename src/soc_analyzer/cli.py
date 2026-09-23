@@ -335,5 +335,25 @@ def predict(path: str, model: str, source: str | None) -> None:
     pipeline.stop()
 
 
+@main.command()
+@click.option("--host", "-h", default="0.0.0.0", help="Host to bind to.")
+@click.option("--port", "-p", type=int, default=8000, help="Port to listen on.")
+@click.option("--reload", is_flag=True, help="Auto-reload on code changes (dev mode).")
+def serve(host: str, port: int, reload: bool) -> None:
+    """Start the API server and dashboard."""
+    import uvicorn
+    console.print(f"\n[bold cyan]SOC Log Analyzer API[/]")
+    console.print(f"  Dashboard: [link]http://localhost:{port}[/link]")
+    console.print(f"  API docs:  [link]http://localhost:{port}/docs[/link]")
+    console.print()
+    uvicorn.run(
+        "soc_analyzer.api.app:create_app",
+        factory=True,
+        host=host,
+        port=port,
+        reload=reload,
+    )
+
+
 if __name__ == "__main__":
     main()

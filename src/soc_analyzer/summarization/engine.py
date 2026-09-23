@@ -153,7 +153,7 @@ class SummarizationEngine:
 
             if format == "json":
                 filepath = output_dir / f"{safe_id}.json"
-                with open(filepath, "w") as f:
+                with open(filepath, "w", encoding="utf-8") as f:
                     json.dump(report.model_dump(mode="json"), f, indent=2, default=str)
             else:
                 filepath = output_dir / f"{safe_id}.md"

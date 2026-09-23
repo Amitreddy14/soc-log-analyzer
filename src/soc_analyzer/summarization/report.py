@@ -128,8 +128,8 @@ class IncidentReport(BaseModel):
             ])
             for action in sorted(self.response_actions, key=lambda a: a.priority):
                 priority_label = {1: "[!] IMMEDIATE", 2: "[*] URGENT", 3: "[-] STANDARD"}.get(
-    action.priority, "[ ] INFO"
-)
+                    action.priority, "[ ] INFO"
+                )
                 lines.append(f"- **{priority_label}:** {action.action}")
                 if action.rationale:
                     lines.append(f"  - *{action.rationale}*")
